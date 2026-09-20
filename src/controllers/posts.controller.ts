@@ -1,14 +1,26 @@
 import { Request, Response } from "express";
 import { pool } from "../config/database";
+import { sanitizeText } from "../utils";
 
 export const createPost = async (req: Request, res: Response) => {
-  const { title, content, userId } = req.body;
+  const { title, content } = req.body;
 
-  if (!title || !content || !userId) {
+  if (!title || !content) {
     return res.status(400).json({
-      message: "Title, content and userId are required",
+      message: "Title and content are required",
     });
   }
+
+  if (typeof title !== "string" || typeof content !== "string") {
+    return res.status(400).json({
+      message: "Title and content must be strings",
+    });
+  }
+
+  const sanitizedTitle = sanitizeText(title);
+  const sanitizedContent = sanitizeText(content);
+
+  const userId = req.user!.userId;
 
   const result = await pool.query(
     `
@@ -16,7 +28,7 @@ export const createPost = async (req: Request, res: Response) => {
       VALUES ($1, $2, $3)
       RETURNING id, title, content, user_id, created_at
     `,
-    [title, content, userId],
+    [sanitizedTitle, sanitizedContent, userId],
   );
 
   return res.status(201).json({
@@ -64,15 +76,25 @@ export const updatePost = async (req: Request, res: Response) => {
     });
   }
 
+  if (typeof title !== "string" || typeof content !== "string") {
+    return res.status(400).json({
+      message: "Title and content must be strings",
+    });
+  }
+
+  const sanitizedTitle = sanitizeText(title);
+  const sanitizedContent = sanitizeText(content);
+
   const result = await pool.query(
     `
       UPDATE posts
       SET title = $1,
           content = $2
       WHERE id = $3
+        AND user_id = $4
       RETURNING id, title, content, user_id, created_at
     `,
-    [title, content, id],
+    [sanitizedTitle, sanitizedContent, id, req.user!.userId],
   );
 
   if (result.rows.length === 0) {
@@ -93,9 +115,10 @@ export const deletePost = async (req: Request, res: Response) => {
     `
       DELETE FROM posts
       WHERE id = $1
+        AND user_id = $2
       RETURNING id
     `,
-    [id],
+    [id, req.user!.userId],
   );
 
   if (result.rows.length === 0) {
