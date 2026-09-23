@@ -34,27 +34,20 @@ jobs:
       - name: Build TypeScript
         run: npm run build
 
-      # SAST
       - name: SAST - npm audit
         run: npm audit --audit-level=high
 
-      # SCA
       - name: SCA - Snyk dependency scan
         uses: snyk/actions/node@v1
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
           args: --severity-threshold=high
-
-      - name: SCA - Save Snyk report
-        if: always()
-        run: |
-          npx snyk test --json > snyk-report.json || true
+          json: true
 
       - name: Upload Snyk report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: snyk-security-report
-          path: snyk-report.json
+          path: snyk.json
